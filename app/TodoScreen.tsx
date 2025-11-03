@@ -3,16 +3,21 @@ import { useMutation, useQuery } from "convex/react";
 import { Moon, Sun, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-    Dimensions,
-    ImageBackground,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  ImageBackground,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+import DraggableFlatList, {
+  RenderItemParams,
+  ScaleDecorator,
+} from "react-native-draggable-flatlist";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 type FilterType = "all" | "active" | "completed";
 
@@ -20,17 +25,23 @@ const MAX_CONTENT_WIDTH = 540;
 const _isDesktop =
   Platform.OS === "web" && Dimensions.get("window").width > 768;
 
+interface ReorderableTodo {
+  _id: any;
+  text: string;
+  completed: boolean;
+  order: number;
+}
+
 const TodoScreen = () => {
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [isDarkMode, setIsDarkMode] = useState(true);
-
-  const todos = (useQuery(api.todos.getTodos) as any[]) ?? [];
+  const todos = (useQuery(api.todos.getTodos) as ReorderableTodo[]) ?? [];
   const addTodo = useMutation(api.todos.addTodo);
   const toggleTodo = useMutation(api.todos.toggleTodo);
   const deleteTodo = useMutation(api.todos.deleteTodo);
   const clearCompleted = useMutation(api.todos.clearCompleted);
-
+  const setTodoOrder = useMutation(api.todos.setOrder);
   const handleAddTodo = async () => {
     if (input.trim()) {
       await addTodo({ text: input });
@@ -46,14 +57,24 @@ const TodoScreen = () => {
   const handleClearCompleted = async () => {
     await clearCompleted();
   };
+  const handleDragEnd = async ({ data }: { data: ReorderableTodo[] }) => {
+    const newOrder = data.map((todo, index) => ({
+      id: todo._id,
+      order: index,
+    }));
 
+    try {
+      await setTodoOrder({ newOrder });
+    } catch (error) {
+      console.error("Failed to update todo order:", error);
+    }
+  };
   const filteredTodos = todos.filter((todo) => {
     if (filter === "active") return !todo.completed;
     if (filter === "completed") return todo.completed;
     return true;
   });
   const itemsLeft = todos.filter((t) => !t.completed).length || 0;
-
   const bgImage = isDarkMode
     ? require("@/assets/images/Bitmap.jpg")
     : require("@/assets/images/Bitmap-light.jpg");
@@ -73,179 +94,201 @@ const TodoScreen = () => {
 
   const footerTextColor = isDarkMode ? "#5B5E7E" : "#5B5E7E";
   const filterInactiveColor = isDarkMode ? "#5B5E7E" : "#999";
+  const renderItem = ({
+    item,
+    drag,
+    isActive,
+    getIndex,
+  }: RenderItemParams<ReorderableTodo>) => {
+    const index = getIndex();
+    const isLast = index === filteredTodos.length - 1;
 
-  return (
-    <View style={[styles.screenBase, { backgroundColor: screenBaseColor }]}>
-      <ImageBackground
-        source={bgImage}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      >
-        <View
-          style={[styles.colorOverlay, { backgroundColor: overlayColor }]}
-        />
-      </ImageBackground>
-
-      <View style={styles.outerContainerLayer}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: textColor }]}>TODO</Text>
-          <TouchableOpacity
-            onPress={() => setIsDarkMode(!isDarkMode)}
-            style={styles.themeToggle}
-          >
-            {isDarkMode ? (
-              <Sun size={24} color="#ffffff" fill="#ffffff" />
-            ) : (
-              <Moon size={24} color="#ffffff" fill="#ffffff" />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.mainContainer, { backgroundColor: inputBg }]}>
-          <View style={styles.inputSection}>
-            <View
+    return (
+      <ScaleDecorator>
+        <View key={item._id}>
+          <View style={styles.todoItem}>
+            <TouchableOpacity
+              onLongPress={drag}
               style={[
-                styles.inputWrapper,
-                { borderBottomColor: checkboxBorderColor },
+                styles.checkbox,
+                {
+                  borderColor: accentColor,
+                  backgroundColor: item.completed ? accentColor : "transparent",
+                },
+              ]}
+              onPress={() => handleToggleTodo(item._id)}
+            >
+              {item.completed && (
+                <Text
+                  style={{ color: "white", fontSize: 16, fontWeight: "bold" }}
+                >
+                  {" "}
+                  ✓{" "}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <Text
+              style={[
+                styles.todoText,
+                {
+                  color: item.completed
+                    ? isDarkMode
+                      ? "#5a6a79"
+                      : "#999"
+                    : textColor,
+                  textDecorationLine: item.completed ? "line-through" : "none",
+                },
               ]}
             >
-              <View
-                style={[
-                  styles.checkbox,
-                  { borderColor: accentColor, backgroundColor: "transparent" },
-                ]}
-              />
-              <TextInput
-                style={[styles.input, { color: textColor }]}
-                placeholder="Create a new todo..."
-                placeholderTextColor={isDarkMode ? "#7a8a99" : "#999"}
-                value={input}
-                onChangeText={setInput}
-                onSubmitEditing={handleAddTodo}
-              />
-            </View>
-          </View>
-        </View>
-
-        <View style={[styles.todoListContainer, { backgroundColor: inputBg }]}>
-          <ScrollView
-            style={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          >
-            {filteredTodos.map((todo, idx) => (
-              <View key={todo._id}>
-                <View style={styles.todoItem}>
-                  <TouchableOpacity
-                    style={[
-                      styles.checkbox,
-                      {
-                        borderColor: accentColor,
-                        backgroundColor: todo.completed
-                          ? accentColor
-                          : "transparent",
-                      },
-                    ]}
-                    onPress={() => handleToggleTodo(todo._id)}
-                  >
-                    {todo.completed && (
-                      <Text
-                        style={{
-                          color: "white",
-                          fontSize: 16,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ✓
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-
-                  <Text
-                    style={[
-                      styles.todoText,
-                      {
-                        color: todo.completed
-                          ? isDarkMode
-                            ? "#5a6a79"
-                            : "#999"
-                          : textColor,
-                        textDecorationLine: todo.completed
-                          ? "line-through"
-                          : "none",
-                      },
-                    ]}
-                  >
-                    {todo.text}
-                  </Text>
-
-                  <TouchableOpacity
-                    onPress={() => handleDeleteTodo(todo._id)}
-                    style={styles.deleteBtn}
-                  >
-                    <X size={18} color={isDarkMode ? "#5a6a79" : "#ccc"} />
-                  </TouchableOpacity>
-                </View>
-                {idx < filteredTodos.length - 1 && (
-                  <View
-                    style={[
-                      styles.separator,
-                      { backgroundColor: separatorColor },
-                    ]}
-                  />
-                )}
-              </View>
-            ))}
-          </ScrollView>
-
-          <View
-            style={[styles.footer, { borderTopColor: checkboxBorderColor }]}
-          >
-            <Text style={[styles.itemsLeft, { color: footerTextColor }]}>
-              {itemsLeft} items left
+              {item.text}
             </Text>
-            <TouchableOpacity onPress={handleClearCompleted}>
-              <Text style={[styles.footerText, { color: footerTextColor }]}>
-                Clear Completed
-              </Text>
+
+            <TouchableOpacity
+              onPress={() => handleDeleteTodo(item._id)}
+              style={styles.deleteBtn}
+            >
+              <X size={18} color={isDarkMode ? "#5a6a79" : "#ccc"} />
             </TouchableOpacity>
           </View>
+          {!isLast && (
+            <View
+              style={[styles.separator, { backgroundColor: separatorColor }]}
+            />
+          )}
         </View>
+      </ScaleDecorator>
+    );
+  };
 
-        <View style={[styles.filterContainer, { backgroundColor: inputBg }]}>
-          <View style={styles.filterButtons}>
-            {(["all", "active", "completed"] as FilterType[]).map((f) => (
-              <TouchableOpacity
-                key={f}
-                onPress={() => setFilter(f)}
-                style={styles.filterBtn}
+  return (
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <View style={[styles.screenBase, { backgroundColor: screenBaseColor }]}>
+        <ImageBackground
+          source={bgImage}
+          style={styles.backgroundImage}
+          resizeMode="cover"
+        >
+          <View
+            style={[styles.colorOverlay, { backgroundColor: overlayColor }]}
+          />
+        </ImageBackground>
+
+        <View style={styles.outerContainerLayer}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: textColor }]}>TODO</Text>
+            <TouchableOpacity
+              onPress={() => setIsDarkMode(!isDarkMode)}
+              style={styles.themeToggle}
+            >
+              {isDarkMode ? (
+                <Sun size={24} color="#ffffff" fill="#ffffff" />
+              ) : (
+                <Moon size={24} color="#ffffff" fill="#ffffff" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.mainContainer, { backgroundColor: inputBg }]}>
+            <View style={styles.inputSection}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  { borderBottomColor: checkboxBorderColor },
+                ]}
               >
-                <Text
+                <View
                   style={[
-                    styles.filterText,
+                    styles.checkbox,
                     {
-                      color: filter === f ? accentColor : filterInactiveColor,
-                      fontWeight: filter === f ? "700" : "400",
+                      borderColor: accentColor,
+                      backgroundColor: "transparent",
                     },
                   ]}
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                />
+                <TextInput
+                  style={[styles.input, { color: textColor }]}
+                  placeholder="Create a new todo..."
+                  placeholderTextColor={isDarkMode ? "#7a8a99" : "#999"}
+                  value={input}
+                  onChangeText={setInput}
+                  onSubmitEditing={handleAddTodo}
+                />
+              </View>
+            </View>
+          </View>
+
+          <View
+            style={[styles.todoListContainer, { backgroundColor: inputBg }]}
+          >
+            <DraggableFlatList
+              data={filteredTodos}
+              keyExtractor={(item) => item._id.toString()}
+              onDragEnd={handleDragEnd}
+              renderItem={renderItem}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                flexGrow: 1,
+              }}
+              activationDistance={10}
+            />
+
+            <View
+              style={[styles.footer, { borderTopColor: checkboxBorderColor }]}
+            >
+              <Text style={[styles.itemsLeft, { color: footerTextColor }]}>
+                {itemsLeft} items left
+              </Text>
+              <TouchableOpacity onPress={handleClearCompleted}>
+                <Text style={[styles.footerText, { color: footerTextColor }]}>
+                  Clear Completed
                 </Text>
               </TouchableOpacity>
-            ))}
+            </View>
           </View>
-        </View>
 
-        <Text
-          style={[styles.dragHint, { color: isDarkMode ? "#3a4a59" : "#ddd" }]}
-        >
-          Drag and drop to reorder list
-        </Text>
+          <View style={[styles.filterContainer, { backgroundColor: inputBg }]}>
+            <View style={styles.filterButtons}>
+              {(["all", "active", "completed"] as FilterType[]).map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setFilter(f)}
+                  style={styles.filterBtn}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      {
+                        color: filter === f ? accentColor : filterInactiveColor,
+                        fontWeight: filter === f ? "700" : "400",
+                      },
+                    ]}
+                  >
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <Text
+            style={[
+              styles.dragHint,
+              { color: isDarkMode ? "#3a4a59" : "#ddd" },
+            ]}
+          >
+            Drag and drop to reorder list
+          </Text>
+        </View>
       </View>
-    </View>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
   screenBase: {
     flex: 1,
   },
@@ -335,6 +378,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
     gap: 12,
+    backgroundColor: "transparent",
   },
   separator: {
     height: 1,
@@ -377,9 +421,8 @@ const styles = StyleSheet.create({
     fontFamily: "Josefin-Regular",
     letterSpacing: -0.194,
   },
-  // FIX: Ensure filterContainer uses consistent centering properties
   filterContainer: {
-    width: "100%", // Use 100% width within the outer container's padding
+    width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: "center",
     borderRadius: 8,
