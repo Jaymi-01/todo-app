@@ -1,50 +1,104 @@
-# Welcome to your Expo app 👋
+To-Do App (Expo & Convex)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a modern, cross-platform mobile and web application for managing tasks. It features real-time data synchronization using Convex as the backend, dual light/dark theming, and drag-and-drop reordering.
 
-## Get started
+🚀 Core Technologies
 
-1. Install dependencies
+Frontend: React Native (Expo SDK)
 
-   ```bash
-   npm install
-   ```
+Styling: React Native Stylesheet (Responsive Layout)
 
-2. Start the app
+Database: Convex (Real-time CRUD and State Management)
 
-   ```bash
-   npx expo start
-   ```
+Gestures: react-native-draggable-flatlist (for task reordering)
 
-In the output, you'll find options to open the app in a
+Typography: Josefin Sans font family
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+🛠️ Setup and Installation
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1. Prerequisites
 
-## Get a fresh project
+Node.js (LTS version)
 
-When you're ready, run:
+Expo CLI (npm install -g expo-cli)
 
-```bash
-npm run reset-project
+EAS CLI (npm install -g eas-cli)
+
+Convex CLI (npm install -g convex-cli)
+
+2. Project Initialization
+
+Clone the repository:
+```
+git clone [Jaymi-01/todo-app]
+cd todo-app
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Install dependencies:
+```
+npm install
+```
 
-## Learn more
+Install Native Dependencies (Crucial for Drag/Drop):
+```
+npx expo install react-native-reanimated react-native-gesture-handler react-native-svg react-native-draggable-flatlist
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+3. Convex Backend Setup
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Log in to Convex and initialize the project:
+```
+convex init
+```
+# Follow the prompts to link to your Convex deployment.
 
-## Join the community
 
-Join our community of developers creating universal apps.
+Deploy Functions: Ensure the todos.ts file (containing getTodos, addTodo, toggleTodo, deleteTodo, clearCompleted, and setOrder) is deployed.
+```
+npx convex deploy
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Set Environment Variable: Ensure your Convex URL is set in your Expo configuration:
+
+# In a local .env file or manually configure in app.json
+EXPO_PUBLIC_CONVEX_URL="YOUR_CONVEX_URL_HERE"
+
+
+🏃 Running the Application
+
+Development Mode
+
+Start the Metro bundler:
+```
+npx expo start
+```
+
+Scan the QR code with the Expo Go app for iOS/Android testing.
+
+Press w to view the app on the web.
+
+Production Build (Deployment)
+
+Use EAS Build to create installable native binaries:
+
+Android (.apk):
+```
+eas build -p android --profile production
+```
+
+(Note: This profile is set to generate an .apk file for direct sharing.)
+
+iOS (.ipa):
+```
+eas build -p ios --profile production
+```
+
+✅ Features Implemented
+
+Theme Switching: Persistent Light/Dark mode.
+
+CRUD: Create, Read, Update (toggle), and Delete tasks.
+
+Filtering: Filter tasks by All, Active, and Completed states.
+
+Reordering: Real-time Drag and Drop reordering persisted via the setOrder Convex mutation.
